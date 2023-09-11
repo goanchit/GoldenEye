@@ -1,8 +1,7 @@
-package database
+package repository
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -11,36 +10,22 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"goldeneye.com/m/v2/config"
 	"goldeneye.com/m/v2/models"
-	"goldeneye.com/m/v2/structures"
 )
 
-type DatabaseConfig struct {
+type databaseConfig struct {
 	client *mongo.Client
 }
 
-type MongoDB interface {
-	GetUserData(ctx context.Context, userId string) *structures.User
-	GetUserPostCount(ctx context.Context, userId string) int64
-	InsertAuthorPost(ctx context.Context, document interface{}) bool
-
-	BulkInsertUserData(ctx context.Context, document []interface{}) error
-
-	UpdateAuthorScore(ctx context.Context, collection string, filter interface{}, update interface{}) (*mongo.UpdateResult, error)
-}
-
-func NewClient() (*DatabaseConfig, error) {
-	client := config.Client
-
-	return &DatabaseConfig{
+func NewClient(client *mongo.Client) *databaseConfig {
+	return &databaseConfig{
 		client: client,
-	}, nil
+	}
 }
 
-func (c *DatabaseConfig) GetUserData(ctx context.Context, document models.MessageBody) *structures.User {
+func (c databaseConfig) GetUserData(ctx context.Context, document models.MessageBody) *models.User {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
-	var result structures.User
+	var result models.User
 
 	err := db.Collection("User").FindOne(ctx, bson.M{"uuid": document.UserId}).Decode(&result)
 	if err != nil {
@@ -51,7 +36,7 @@ func (c *DatabaseConfig) GetUserData(ctx context.Context, document models.Messag
 	return &result
 }
 
-func (c *DatabaseConfig) GetUserPostCount(ctx context.Context, userId string) int64 {
+func (c databaseConfig) GetUserPostCount(ctx context.Context, userId string) int64 {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 	authorPostCount, err := db.Collection("AuthorPost").CountDocuments(ctx, bson.M{"uuid": userId})
 	if err != nil {
@@ -63,16 +48,16 @@ func (c *DatabaseConfig) GetUserPostCount(ctx context.Context, userId string) in
 }
 
 // Add new post on database. Increase Post Score by 1
-func (c *DatabaseConfig) InsertAuthorPost(ctx context.Context, document models.MessageBody) bool {
+func (c databaseConfig) InsertAuthorPost(ctx context.Context, document models.MessageBody) bool {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 
-	err := db.Client().UseSession(context.TODO(), func(sc mongo.SessionContext) error {
+	err := db.Client().UseSession(ctx, func(sc mongo.SessionContext) error {
 		err := sc.StartTransaction()
 		if err != nil {
 			return err
 		}
 
-		user := structures.User{
+		user := models.User{
 			UUID:             document.UserId,
 			IsAuthor:         true,
 			IsUser:           false,
@@ -97,7 +82,7 @@ func (c *DatabaseConfig) InsertAuthorPost(ctx context.Context, document models.M
 			return err
 		}
 
-		authorPost := structures.AuthorPost{
+		authorPost := models.AuthorPost{
 			UUID:      document.UserId,
 			Message:   document.Message,
 			CreatedAt: time.Now(),
@@ -126,7 +111,7 @@ func (c *DatabaseConfig) InsertAuthorPost(ctx context.Context, document models.M
 	return userData.IsPremiumAccount
 }
 
-func (c *DatabaseConfig) BulkInsertUserData(ctx context.Context, document []interface{}) error {
+func (c *databaseConfig) BulkInsertUserData(ctx context.Context, document []interface{}) error {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 
 	_, err := db.Collection("User").InsertMany(ctx, document)
@@ -136,7 +121,7 @@ func (c *DatabaseConfig) BulkInsertUserData(ctx context.Context, document []inte
 	return nil
 }
 
-func (c *DatabaseConfig) GetAllAuthorData(ctx context.Context) ([]structures.User, primitive.M) {
+func (c *databaseConfig) GetAllAuthorData(ctx context.Context) ([]models.User, primitive.M) {
 	client := c.client
 	var result bson.M
 
@@ -158,10 +143,10 @@ func (c *DatabaseConfig) GetAllAuthorData(ctx context.Context) ([]structures.Use
 		log.Println(err)
 	}
 
-	var authorDataList []structures.User
+	var authorDataList []models.User
 
 	for curr.Next(ctx) {
-		var authordata structures.User
+		var authordata models.User
 		if err := curr.Decode(&authordata); err != nil {
 			log.Printf("Error decoding author data %s", err)
 		}
@@ -171,7 +156,7 @@ func (c *DatabaseConfig) GetAllAuthorData(ctx context.Context) ([]structures.Use
 	return authorDataList, result
 }
 
-func (c *DatabaseConfig) GetRecentPostCountByAuthorsId(ctx context.Context, authorIds []string, bufferDate time.Time) map[string]int {
+func (c *databaseConfig) GetRecentPostCountByAuthorsId(ctx context.Context, authorIds []string, bufferDate time.Time) map[string]int {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 
 	m := make(map[string]int)
@@ -186,7 +171,7 @@ func (c *DatabaseConfig) GetRecentPostCountByAuthorsId(ctx context.Context, auth
 	return m
 }
 
-func (c *DatabaseConfig) UpdateAuthorPremiumStatus(ctx context.Context, authorIds []string, isPremium bool) {
+func (c *databaseConfig) UpdateAuthorPremiumStatus(ctx context.Context, authorIds []string, isPremium bool) {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 
 	_, err := db.Collection("User").UpdateMany(ctx, bson.M{"uuid": bson.M{"$in": authorIds}}, bson.M{"$set": bson.M{"isPremiumAccount": isPremium}})
@@ -197,7 +182,7 @@ func (c *DatabaseConfig) UpdateAuthorPremiumStatus(ctx context.Context, authorId
 	return
 }
 
-func (c *DatabaseConfig) UpdateAuthorFollowers(ctx context.Context, authorId string, followerCount int) {
+func (c *databaseConfig) UpdateAuthorFollowers(ctx context.Context, authorId string, followerCount int) {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 	_, err := db.Collection("User").UpdateOne(ctx, bson.M{"uuid": authorId}, bson.D{{"$inc", bson.D{{"followers", followerCount}}}})
 	if err != nil {
@@ -207,7 +192,7 @@ func (c *DatabaseConfig) UpdateAuthorFollowers(ctx context.Context, authorId str
 	return
 }
 
-func (c *DatabaseConfig) UpdateGlobalSettings(ctx context.Context, document interface{}) {
+func (c *databaseConfig) UpdateGlobalSettings(ctx context.Context, document interface{}) {
 	db := c.client.Database(os.Getenv("DATABASE_NAME"))
 
 	settingsObjectId := os.Getenv("SETTINGS_DOCUMENT_ID")
@@ -217,12 +202,12 @@ func (c *DatabaseConfig) UpdateGlobalSettings(ctx context.Context, document inte
 		log.Fatal(err)
 	}
 
-	result, err := db.Collection("settings").UpdateOne(context.TODO(), bson.M{"_id": objectID}, bson.M{"$set": document})
+	result, err := db.Collection("settings").UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{"$set": document})
 	if err != nil {
 		log.Fatal(err)
 		log.Fatal("Failed to update settings")
 	}
 
-	fmt.Printf("Matched %v documents and modified %v documents\n", result.MatchedCount, result.ModifiedCount)
+	log.Printf("Matched %v documents and modified %v documents\n", result.MatchedCount, result.ModifiedCount)
 	return
 }

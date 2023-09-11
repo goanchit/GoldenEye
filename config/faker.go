@@ -27,7 +27,6 @@ func convertToInterfaceSlice(inputSlice []FakeUserStruct) []interface{} {
 }
 
 // Generate Fake User Data which will depict users
-
 func GenerateFakeData() []interface{} {
 	var fakeData []FakeUserStruct
 	i := 1

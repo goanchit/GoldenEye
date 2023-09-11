@@ -20,16 +20,18 @@ func main() {
 		log.Fatal("Error loading env file")
 	}
 
-	mongoClient := config.ConnectDb()
+	ctx := context.Background()
+
+	mongoClient := config.ConnectDb(ctx)
 
 	defer func() {
-		if err := mongoClient.Disconnect(context.TODO()); err != nil {
+		if err := mongoClient.Disconnect(ctx); err != nil {
 			panic(err)
 		}
 	}()
 
-	consumer, err := consumers.NewConsumer("AUTHOR_POST")
-	consumer2, err := consumers.NewConsumer("AUTHOR_STATUS_JOB")
+	consumer, err := consumers.NewConsumer("AUTHOR_POST", mongoClient)
+	consumer2, err := consumers.NewConsumer("AUTHOR_STATUS_JOB", mongoClient)
 
 	defer consumer.Close()
 	defer consumer2.Close()
@@ -46,7 +48,7 @@ func main() {
 	// Consumer for author daily subscription job
 	go consumer2.AuthorUpdateSubscription()
 
-	api.RouteHander(r)
+	api.RouteHander(r, mongoClient)
 
 	if err := r.Run(":8000"); err != nil {
 		log.Fatalln("Failed to run service")

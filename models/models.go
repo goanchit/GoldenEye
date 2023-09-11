@@ -1,6 +1,8 @@
 package models
 
-import "goldeneye.com/m/v2/structures"
+import (
+	"time"
+)
 
 type MessageBody struct {
 	UserId  string `json:"userId" validate:"required,uuid"`
@@ -15,6 +17,23 @@ type Settings struct {
 }
 
 type AuthorPremiumJob struct {
-	Data     []structures.User `json:"data"`
-	Settings Settings          `json:"settings"`
+	Data     []User   `json:"data"`
+	Settings Settings `json:"settings"`
+}
+
+type AuthorPost struct {
+	UUID      string    `bson:"uuid"`
+	Message   string    `bson:"message"`
+	CreatedAt time.Time `bson:"createdAt"`
+	UpdatedAt time.Time `bson:"updatedAt"`
+}
+
+type User struct {
+	UUID             string    `bson:"uuid"`
+	IsAuthor         bool      `bson:"isAuthor"`
+	IsUser           bool      `bson:"isUser"`
+	IsPremiumAccount bool      `bson:"isPremiumAccount"`
+	CreatedAt        time.Time `bson:"createdAt"`
+	UpdatedAt        time.Time `bson:"updatedAt"`
+	Followers        int       `bson:"followers,omitempty"`
 }

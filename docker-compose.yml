@@ -1,0 +1,32 @@
+version: "3.2"
+services:
+  server:
+    container_name: server-go
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - 8000:8000
+    depends_on:
+      - rabbitmq
+    networks:
+      - backend
+      
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    hostname: rabbitmq
+    ports:
+        - 5672:5672
+        - 15672:15672
+    volumes:
+        - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+        - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    networks:
+        - backend
+
+networks:
+  backend:
+    driver: bridge

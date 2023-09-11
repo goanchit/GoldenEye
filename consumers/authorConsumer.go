@@ -11,30 +11,35 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	"goldeneye.com/m/v2/database"
+	"go.mongodb.org/mongo-driver/mongo"
 	"goldeneye.com/m/v2/models"
+	"goldeneye.com/m/v2/repository"
 )
 
 type Consumer struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	queue   amqp.Queue
+	db      *mongo.Client
 }
 
 func getMQConnectionString() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%s/", os.Getenv("RABBITMQ_LOGIN"), os.Getenv("RABBITMQ_PASSWORD"), os.Getenv("RABBITMQ_HOST"), os.Getenv("RABBITMQ_PORT"))
 }
 
-func NewConsumer(queueName string) (*Consumer, error) {
+func NewConsumer(queueName string, mongo *mongo.Client) (*Consumer, error) {
 	connection_string := getMQConnectionString()
 
+	log.Printf("Connection String %s", connection_string)
 	conn, err := amqp.Dial(connection_string)
 	if err != nil {
+		log.Fatal(err)
 		return nil, err
 	}
 
 	channel, err := conn.Channel()
 	if err != nil {
+		log.Fatal(err)
 		return nil, err
 	}
 
@@ -42,6 +47,7 @@ func NewConsumer(queueName string) (*Consumer, error) {
 		queueName, true, false, false, false, nil,
 	)
 	if err != nil {
+		log.Fatal(err)
 		return nil, err
 	}
 
@@ -49,6 +55,7 @@ func NewConsumer(queueName string) (*Consumer, error) {
 		conn:    conn,
 		channel: channel,
 		queue:   q,
+		db:      mongo,
 	}, nil
 }
 
@@ -82,9 +89,11 @@ func (c *Consumer) AuthorPostConsumer() error {
 		if err != nil {
 			log.Fatal(err)
 		}
+		ctx := context.Background()
+
 		// Upsert Post increment Count and fanout based on eligibility
-		mongoClient, err := database.NewClient()
-		isPremiumAuthor := mongoClient.InsertAuthorPost(context.TODO(), messageBody)
+		mongoClient := repository.NewClient(c.db)
+		isPremiumAuthor := mongoClient.InsertAuthorPost(ctx, messageBody)
 
 		if isPremiumAuthor {
 			// Send Post to premium users
@@ -95,7 +104,7 @@ func (c *Consumer) AuthorPostConsumer() error {
 		// Below code depicts number of random followers to be added
 		randomFollowers := rand.Intn(10)
 
-		mongoClient.UpdateAuthorFollowers(context.TODO(), messageBody.UserId, randomFollowers)
+		mongoClient.UpdateAuthorFollowers(ctx, messageBody.UserId, randomFollowers)
 
 	}
 
@@ -138,13 +147,15 @@ func (c *Consumer) AuthorUpdateSubscription() error {
 
 		}
 
-		mongoClient, err := database.NewClient()
+		ctx := context.Background()
+
+		mongoClient := repository.NewClient(c.db)
 
 		currentTime := time.Now()
 
 		prevDays := currentTime.AddDate(0, 0, -messageBody.Settings.DaysBuffer)
 
-		authorPostCountMap := mongoClient.GetRecentPostCountByAuthorsId(context.TODO(), premiumAuthorsList, prevDays)
+		authorPostCountMap := mongoClient.GetRecentPostCountByAuthorsId(ctx, premiumAuthorsList, prevDays)
 
 		for _, v := range messageBody.Data {
 			val, ok := authorPostCountMap[v.UUID]
@@ -157,8 +168,8 @@ func (c *Consumer) AuthorUpdateSubscription() error {
 		}
 
 		// Below Jobs wont run as mongodb creates a copy of current DB and free plan doesnt have much space for it
-		// mongoClient.UpdateAuthorPremiumStatus(context.TODO(), premiumAuthorsList, true)
-		// mongoClient.UpdateAuthorPremiumStatus(context.TODO(), nonpremiumAuthorsList, false)
+		// mongoClient.UpdateAuthorPremiumStatus(ctx, premiumAuthorsList, true)
+		// mongoClient.UpdateAuthorPremiumStatus(ctx, nonpremiumAuthorsList, false)
 
 		// From below statement we are manually acknowledging the queue so it deletes the message
 		d.Ack(false)

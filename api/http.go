@@ -7,10 +7,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"goldeneye.com/m/v2/models"
+	"goldeneye.com/m/v2/repository"
 	"goldeneye.com/m/v2/service"
 )
 
-func PostMessage(c *gin.Context) {
+type Server struct {
+	repository repository.Repository
+}
+
+func NewServer(repository repository.Repository) *Server {
+	return &Server{
+		repository: repository,
+	}
+}
+
+func (s Server) PostMessage(c *gin.Context) {
 	body := models.MessageBody{}
 
 	if err := c.ShouldBind(&body); err != nil {
@@ -37,14 +48,27 @@ func PostMessage(c *gin.Context) {
 	})
 }
 
-func UpdateAuthorStatus(c *gin.Context) {
-	service.UpdateAuthorStatusJob(c)
+func (s Server) UpdateAuthorStatus(c *gin.Context) {
+
+	allAuthors, settings := s.repository.GetAllAuthorData(c)
+
+	batches := chunkBy(allAuthors, 4)
+
+	for _, v := range batches {
+		m := make(map[string]interface{})
+
+		m["data"] = v
+		m["settings"] = settings
+
+		service.PublishToQueue(c, "AUTHOR_STATUS_JOB", m)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Successfully ran the job",
 	})
 }
 
-func UpdateGlobalSettings(c *gin.Context) {
+func (s Server) UpdateGlobalSettings(c *gin.Context) {
 	body := models.Settings{}
 	if err := c.ShouldBind(&body); err != nil {
 		log.Println(err)
@@ -63,8 +87,17 @@ func UpdateGlobalSettings(c *gin.Context) {
 		return
 	}
 
-	service.UpdateGlobalSettings(c, body)
+	s.repository.UpdateGlobalSettings(c, body)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Successfully updated settings",
 	})
+}
+
+// Convert Array to Slices of size chunkSize
+func chunkBy[T any](items []T, chunkSize int) (chunks [][]T) {
+	for chunkSize < len(items) {
+		items, chunks = items[chunkSize:], append(chunks, items[0:chunkSize:chunkSize])
+	}
+	return append(chunks, items)
 }

@@ -10,30 +10,27 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var Client *mongo.Client
-
 func getMongoConnectionString() string {
 	return fmt.Sprintf("mongodb+srv://%s:%s@cluster0.9jgzm.mongodb.net/?retryWrites=true&w=majority", os.Getenv("MONGO_USER"), os.Getenv("MONGO_PASSWORD"))
 }
 
-func ConnectDb() *mongo.Client {
+func ConnectDb(ctx context.Context) *mongo.Client {
 	connectionString := getMongoConnectionString()
 
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(connectionString).SetServerAPIOptions(serverAPI)
 
-	client, err := mongo.Connect(context.TODO(), opts)
+	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		panic(err)
 	}
 
-	err = client.Ping(context.TODO(), nil)
+	err = client.Ping(ctx, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	log.Println("Database Connected")
 
-	Client = client
 	return client
 }
