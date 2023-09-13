@@ -40,4 +40,4 @@ jobs:
         run: |
           gcloud app deploy
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/service-account.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.SERVICE_ACCOUNT }}
