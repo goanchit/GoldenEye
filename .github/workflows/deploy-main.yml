@@ -38,6 +38,7 @@ jobs:
 
       - name: Deploy to App Engine
         run: |
-          gcloud app deploy
+          gcloud app deploy --quite
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.SERVICE_ACCOUNT }}
+          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
