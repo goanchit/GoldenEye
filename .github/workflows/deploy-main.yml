@@ -22,6 +22,8 @@ jobs:
         run: |
           echo ${{ secrets.ENV_FILE }} > .env
 
+          echo "PROJECT ID: ${{ secrets.PROJECT_ID }}"
+
       - name: Verify Environment File
         run: |
           cat .env
