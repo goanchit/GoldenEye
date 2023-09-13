@@ -38,6 +38,8 @@ jobs:
 
       - name: Deploy to App Engine
         run: |
+          gcloud auth login
+          gcloud config set account ${{ secrets.PROJECT_ID }}
           gcloud app deploy
         env:
           GOOGLE_APPLICATION_CREDENTIALS: '${{ secrets.SERVICE_ACCOUNT }}'
