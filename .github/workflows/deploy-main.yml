@@ -27,20 +27,14 @@ jobs:
           cat .env
           echo "Environment file created."
 
-      - name: Set up Google Cloud SDK
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@v0
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }} # Replace with your GCP project ID
-          service_account_key: ${{ secrets.SERVICE_ACCOUNT }} 
-
-      # - name: Install Google Cloud SDK
-      #   run: |
-      #     curl https://sdk.cloud.google.com | bash
-      #     exec -l $SHELL
-      #     echo "${{ secrets.SERVICE_ACCOUNT }}" > /tmp/service-account.json
-      #     gcloud auth login
-      #     gcloud config set project ${{ secrets.PROJECT_ID }}
-      #     gcloud auth activate-service-account --key-file=/tmp/service-account.json
+      - name: Install Google Cloud SDK
+        run: |
+          curl https://sdk.cloud.google.com | bash
+          exec -l $SHELL
+          echo "${{ secrets.SERVICE_ACCOUNT }}" > /tmp/service-account.json
+          gcloud auth login
+          gcloud config set project ${{ secrets.PROJECT_ID }}
+          gcloud auth activate-service-account --key-file=/tmp/service-account.json
 
       - name: Deploy to App Engine
         run: |
