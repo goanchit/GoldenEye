@@ -32,6 +32,7 @@ jobs:
           curl https://sdk.cloud.google.com | bash
           exec -l $SHELL
           echo "${{ secrets.SERVICE_ACCOUNT }}" > /tmp/service-account.json
+          gcloud auth login
           gcloud config set project ${{ secrets.PROJECT_ID }}
           gcloud auth activate-service-account --key-file=/tmp/service-account.json
 
