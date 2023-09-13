@@ -42,4 +42,4 @@ jobs:
           gcloud config set account ${{ secrets.PROJECT_ID }}
           gcloud app deploy
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: '${{ secrets.SERVICE_ACCOUNT }}'
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.SERVICE_ACCOUNT }}
