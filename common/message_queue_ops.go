@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -15,8 +17,9 @@ func failOnError(err error, msg string) {
 }
 
 func SendMessageToQ(ctx context.Context, qName string, message string) (bool, string) {
+	connectionString := fmt.Sprintf("amqps://%s:%s@puffin.rmq2.cloudamqp.com/%s", os.Getenv("RABBITMQ_LOGIN"), os.Getenv("RABBITMQ_PASSWORD"), os.Getenv("RABBITMQ_LOGIN"))
 
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial(connectionString)
 	failOnError(err, "Failed To Connect to Rabbit MQ")
 	defer conn.Close()
 
